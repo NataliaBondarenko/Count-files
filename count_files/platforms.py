@@ -43,6 +43,10 @@ class BaseOS(object):
                      include_hidden: bool = False, case_sensitive: bool = False) -> Iterable[str]:
         """Find all files in a given directory with and without the extension.
 
+        This function is overridden in a WinOS subclass to handle a special case:
+        to speed up the program when include_hidden=False.
+        In other cases, this inherited search_files() is used.
+
         :param dirpath: full/path/to/folder
         :param extension: extension name (txt, py), '.'(without extension) or '..' (all extensions)
         :param recursive: True(default) or False
@@ -132,7 +136,10 @@ class WinOS(BaseOS):
 
     name = 'WinOS'
 
-    def is_hidden_file_or_dir(self, filepath: str) -> bool:
+    def __init__(self):
+        super().__init__()
+
+    def is_hidden_file_or_dir(self, filepath: str, full_check: bool = True) -> bool:
         """The function determines whether the file or folder in filepath is hidden.
 
         Windows: testing the FILE_ATTRIBUTE_HIDDEN for file or folder.
@@ -147,12 +154,17 @@ class WinOS(BaseOS):
         If filepath is a local drive it returns True.
         is_hidden_file_or_dir('C:/') True , ...('C:') False
         is_hidden_file_or_dir('D:/') True, ...('D:') True
+        :param full_check: if False indicates that check only the final file/dir for FILE_ATTRIBUTE_HIDDEN,
+        if True(default), all parts of the file path are checked
         :param filepath: full/path/to/file.txt or full/path/to_folder
         :return: True if hidden or False if not
         """
-        # list with full paths of all parents in filepath except drive
-        list_for_check = list(Path(filepath).parents)[:-1]
-        list_for_check.append(Path(filepath))
+        if full_check:
+            # list with full paths of all parents in filepath except drive
+            list_for_check = list(Path(filepath).parents)[:-1]
+            list_for_check.append(Path(filepath))
+        else:
+            list_for_check = [filepath]
         response = []
         for some_path in list_for_check:
             try:
@@ -165,6 +177,81 @@ class WinOS(BaseOS):
         if any(response):
             return True
         return False
+
+    def search_files(self, dirpath: str, extension: str, recursive: bool = True,
+                     include_hidden: bool = False, case_sensitive: bool = False) -> Iterable[str]:
+        """Find all files in a given directory with and without the extension.
+        For -fe . or -fe extension_name, -t . or -t extension_name, -fe .. or -t .. (all extensions).
+
+        The function is overridden in a subclass to handle a special case:
+        If you need to get a list of file paths/total number of files,
+        excluding hidden folders and files, on Windows.
+        Separate verification and skipping of hidden root folders and subsequent verification of
+        FILE_ATTRIBUTE_HIDDEN only for final files/dirs in not hidden folders speeds up the program.
+        Such separation allows avoiding duplication of checks
+        if we know for sure that it is necessary to check all file paths.
+        If include_hidden=True: used super().search_files(args).
+
+        Note: if the number of files is much smaller than folders,
+        then the efficiency decreases (depending on the difference in the number).
+        For example, if there are many empty sub_folders: /folder/sub_folder/another_sub_folder/only_one_file
+        But, it performs faster than the old version due to checking only final file/dir.
+
+        'if not dirs and not files' has been added
+        (skip empty root folders before call self.is_hidden_file_or_dir(root)).
+
+        General behavior and parameters are similar to BaseOS().search_files()
+        :param dirpath: full/path/to/folder
+        :param extension: extension name (txt, py), '.'(without extension) or '..' (all extensions)
+        :param recursive: True(default) or False
+        :param include_hidden: False -> exclude hidden, True -> include hidden, counting all files
+        :param case_sensitive: False -> ignore case in extensions,
+        True -> distinguish case variations in extensions
+        :return: object <class 'generator'> with full paths to all found files
+        """
+        if include_hidden is False:
+            # this part used for -fe .. or -t .. (all extensions)
+            if extension == '..':
+                for root, dirs, files in os.walk(dirpath):
+                    # skip empty folders
+                    if not dirs and not files:
+                        continue
+                    # check not empty root folder, skip hidden root and all it's files
+                    if self.is_hidden_file_or_dir(root, full_check=False):
+                        # get rid of all sub_folders if dirs list is not empty
+                        dirs.clear() if dirs else dirs
+                        continue
+                    for f in files:
+                        f_path = os.path.join(root, f)
+                        if not os.path.isfile(f_path):
+                            continue
+                        if not self.is_hidden_file_or_dir(f_path, full_check=False):
+                                yield f_path
+                    if not recursive:
+                        break
+            else:
+                # this part used for: -fe . or -fe extension_name, -t . or -t extension_name
+                ext = extension if case_sensitive else extension.upper()
+                for root, dirs, files in os.walk(dirpath):
+                    # skip empty folders
+                    if not dirs and not files:
+                        continue
+                    # check not empty root folder, skip hidden root and all it's files
+                    if self.is_hidden_file_or_dir(root, full_check=False):
+                        # get rid of all sub_folders if dirs list is not empty
+                        dirs.clear() if dirs else dirs
+                        continue
+                    files = [f for f in files if get_file_extension(f, case_sensitive=case_sensitive) == ext]
+                    for f in files:
+                        f_path = os.path.join(root, f)
+                        if not os.path.isfile(f_path):
+                            continue
+                        if not self.is_hidden_file_or_dir(f_path, full_check=False):
+                                yield f_path
+                    if not recursive:
+                        break
+        else:
+            yield from super().search_files(dirpath, extension, recursive, include_hidden, case_sensitive)
 
 
 class UnixOS(BaseOS):
