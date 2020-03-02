@@ -1,44 +1,42 @@
 """HELP SYSTEM EXTENSION TEXT."""
-from count_files.settings import DOCUMENTATION_URL, DEFAULT_PREVIEW_SIZE
+from count_files.settings import DOCUMENTATION_URL, DEFAULT_PREVIEW_SIZE, CURRENT_INI
 from count_files.utils.viewing_modes import show_help_columns
 
 
 docs_text = f"""COUNT FILES HELP.
 
-Search in help text by topic.
-Start this interactive help:
-    count-files --help-cmd
-Commands:
 More about Count Files Help usage(this section)
     help> help
+Read and display data from Count Files configuration file
+    help> config
 To quit this utility, just type "quit"
     help> quit
-
-BASIC USAGE EXAMPLES:
-Topic - argument or group name, certain words for searching or sorting.
+    
+SEARCH FOR ARGUMENTS:
+Search in help text by topic. Topic - argument or group name.
+Show more detailed help text: Topic must be in lower case.
     help> topic
 Show short help text: Topic must be in upper case or with one letter in upper case.
     help> TOPIC
-Show more detailed help text: Topic must be in lower case.
-    help> topic
 Search by short/long argument name:
     help> st
     help> supported-types
-Sorting arguments by group, including group description:
-(count, search or total)
+  
+SORTING ARGUMENTS:
+Get all count arguments and group description:
     help> count
+All certain words for sorting:
+Sorting arguments by group, including group description - count, search or total.
+Get only group description - count-group or cg, search-group or sg, total-group or tg.
+Get all group descriptions - group.
+Sorting arguments by purpose - service, common, special.
+Sorting arguments by type - positional or optional
 
-ADDITIONAL SECTIONS:
+ALSO USE:
 Get a list of available topics for searching or sorting.
     help> list
 More about search by short/long argument name.
     help> args
-More about sorting arguments by purpose or type.
-    help> sort
-More about sorting arguments by group.
-    help> groups
- 
-ALSO USE:
 Get the standard argparse help with a brief description of all the arguments.
     count-files --help
 Web Docs in English, Portuguese, Russian and Ukrainian:
@@ -56,7 +54,8 @@ arguments = [
              'help', 'h', 'help-cmd', 'hc',
              'no-feedback', 'nf', 'no-recursion', 'nr',
              'preview', 'p', 'preview-size', 'ps', 'show-folders', 'sf',
-             'sort-alpha', 'alpha', 'supported-types', 'st', 'total', 't', 'total-size', 'ts', 'version', 'v']
+             'sort-alpha', 'alpha', 'sort-type', 'type',
+             'supported-types', 'st', 'total', 't', 'total-size', 'ts', 'version', 'v']
 
 docs_args_text = f"""COUNT FILES HELP(ARGS).
 
@@ -180,9 +179,10 @@ topics = {
     'help-cmd': {
         'name': '-hc, --help-cmd',
         'short': 'Search in help by topic - argument or group name(count, search, total). '
-                 'Start interactive help.',
+                 'Read data from Count Files configuration file.',
         'long': 'Search in help by topic - argument or group name(count, search, total). '
-                'Start interactive help. Usage: count-files -hc or count-files --help-cmd.'
+                'Read data from Count Files configuration file. '
+                'Usage: count-files -hc or count-files --help-cmd.'
     },
     'version': {
         'name': '-v, --version',
@@ -210,7 +210,11 @@ topics = {
         'name': '-a, --all',
         'short': 'Include hidden files and directories.',
         'long': 'Include hidden files and directories. '
-                'By default, it will ignore files and directories that are supposed to be hidden. '
+                'For fully supported operating systems (Linux, macOS, iOS, Windows, Haiku), '
+                'any hidden files or folders are ignored by default. '
+                'For other operating systems in which Python can be run, '
+                'this option to include/exclude hidden files is not available. '
+                'And as a result, all existing files will be included.'
                 'In Windows, files and directories considered hidden by this application '
                 'are those for which the FILE_ATTRIBUTE_HIDDEN attribute is set to true. '
                 'In Linux, macOS, iOS and other Unix-like operating systems, '
@@ -303,7 +307,8 @@ topics = {
                 'All file extensions in the table will be displayed in uppercase (default). '
                 'Example: count-files <arguments>. '
                 'Usage: count-files [-a, --all] [-alpha, --sort-alpha] '
-                '[-c, --case-sensitive] [-nr, --no-recursion] [-nf, --no-feedback] [path].'
+                '[-c, --case-sensitive] [-nr, --no-recursion] [-nf, --no-feedback] '
+                '[-type TYPE [TYPE ...], --sort-type TYPE [TYPE ...]] [path].'
     },
     'sort-alpha': {
         'name': '-alpha, --sort-alpha',
@@ -313,6 +318,26 @@ topics = {
                 'and displays the frequency for each file extension. '
                 'To sort the extensions alphabetically, use the -alpha or --sort-alpha argument. '
                 'Example: count-files ---sort-alpha ~/Documents <arguments>.'
+    },
+    'sort-type': {
+        'name': '-type, --sort-type',
+        'short': 'Sort file extensions by type (e.g. images, documents). '
+                 'You can create your own extension groups in the configuration file. '
+                 'If the file does not exist, it is created on demand using this argument with value - "default".',
+        'long': 'Sort file extensions by type (e.g. images, documents). '
+                f"You can create your own extension groups in the configuration file: {CURRENT_INI}. "
+                'If the file does not exist, it is created on demand using this argument with value - "default". '
+                'This action begins the process of creating a default configuration file '
+                'with a description and examples. '
+                'To sort extensions by type, use the -type or --sort-type argument '
+                'with names of extension groups from the configuration file. '
+                'If the same extension is specified in different groups, '
+                'then when sorting it will be assigned to the group '
+                'that is listed first in the type list after the --sort-type argument. '
+                'If you explicitly specify the path to the folder, '
+                'then it should not be after the argument --sort-type so that it does not fall into the list of types. '
+                'Example: count-files ~/Documents --sort-type python_files images <optional arguments>. '
+                'Type "config about" to get more information on how to use this option.'
     },
     'search-group': {
         'name': 'File searching by extension or by pattern',
@@ -441,8 +466,10 @@ indexes = {
 
     ('count-group', 'group', 'count', 'cg'):
         [topics['count-group']['name'], topics['count-group']['short'], topics['count-group']['long']],
-    ('alpha', 'sort-alpha', 'count', 'special', 'optional'):
+    ('alpha', 'sort-alpha', 'sort', 'count', 'special', 'optional'):
         [topics['sort-alpha']['name'], topics['sort-alpha']['short'], topics['sort-alpha']['long']],
+    ('type', 'sort-type', 'sort', 'count', 'special', 'optional'):
+    [topics['sort-type']['name'], topics['sort-type']['short'], topics['sort-type']['long']],
 
     ('search-group', 'group', 'search', 'sg'):
         [topics['search-group']['name'], topics['search-group']['short'], topics['search-group']['long']],
