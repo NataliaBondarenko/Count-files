@@ -4,10 +4,12 @@ Interactive Help based on https://docs.python.org/3/library/cmd.html
 from textwrap import fill
 from itertools import chain
 import cmd
+import os
 
-from count_files.utils.help_text import indexes, docs_text, docs_groups_text, \
-    docs_sort_text, docs_args_text, docs_list_text, docs_general_text
-from count_files.settings import START_TEXT_WIDTH
+from count_files.utils.help_text import indexes, docs_text, \
+    docs_args_text, docs_list_text, docs_general_text
+from count_files.settings import START_TEXT_WIDTH, CURRENT_INI
+from count_files.utils.ini_template import help_readme
 
 
 class HelpCmd(cmd.Cmd):
@@ -20,10 +22,6 @@ class HelpCmd(cmd.Cmd):
     available arguments, group_names, search_words
     help> args
     more about search by short/long argument name
-    help> sort
-    more about sorting arguments by purpose or type
-    help> groups
-    more about sorting arguments by group
     help> <topic>
     search by argument or group name, certain search words
     """
@@ -31,6 +29,7 @@ class HelpCmd(cmd.Cmd):
         cmd.Cmd.__init__(self)
         self.intro = 'Welcome to Count Files Help! Type "help" or "?" to list commands.\n' \
                      'Enter the name of the argument or group to get help text.\n' \
+                     'Enter "config" to read data from the Count Files configuration file.\n' \
                      'To quit, just type "quit".\n'
         self.prompt = 'help> '
 
@@ -43,9 +42,58 @@ class HelpCmd(cmd.Cmd):
         print('Exit the Count Files Help.')
         return True
 
+    def do_config(self, arg):
+        """Read and display data from Count Files configuration file."""
+        config_items = [item.strip() for item in arg.split(' ') if item]
+        # if not exist
+        if not os.path.exists(CURRENT_INI):
+            self.print_help_text(f"\nConfiguration file {CURRENT_INI} does not exist. "
+                                 f"You can create it on demand using --sort-type argument with value - 'default'.")
+            if 'about' in config_items:
+                self.print_help_text(help_readme)
+            else:
+                self.print_help_text('Type "config about" or "sort-type" '
+                                     'to get more information on how to use this option.\n')
+            return
+        else:
+            import configparser
+            config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
+            config.read(CURRENT_INI)
+            sections_list = config.sections()
+            if not sections_list:
+                print(f"No records in configuration file {CURRENT_INI}")
+            if arg:
+                if 'about' in config_items:
+                    self.print_help_text(help_readme)
+                    return
+                # one section or several sections
+                for i in config_items:
+                    print(f"[{i}]")
+                    if i in sections_list:
+                        if config.has_option(i, 'extensions'):
+                            result = config.get(i, 'extensions', fallback='There are no extensions in this section')
+                            if not result:
+                                # handle empty 'extensions' value, key 'extensions' exists with no values
+                                print(f"There are no extensions in this section.")
+                            else:
+                                # print extensions or fallback
+                                print(fill(f"extensions = {result}", width=START_TEXT_WIDTH, initial_indent=' ' * 2, subsequent_indent=' ' * 2))
+                        else:
+                            print(f"There are no extensions in this section.")
+                    else:
+                        print(f"There is no such section '{i}'.")
+            else:
+                self.print_help_text(f"\nAvailable sections in the configuration file\n{CURRENT_INI}.\n")
+                self.print_help_text(', '.join(sorted(config.sections())))
+                self.print_help_text('\nTo get a list of extensions in a specific section(s), use:\n'
+                                     '    help> config section_name\n'
+                                     '    help> config section_1 section_2 section_n\n'
+                                     'How to use the configuration file:\n'
+                                     '    help> config about\n')
+
     def emptyline(self):
         """Method called when an empty line is entered in response to the prompt."""
-        print('Please enter command name(cmd, help, quit) or search word.')
+        print('Please enter command name(config, help, quit) or search word.')
 
     def default(self, arg: str):
         """Search in help text."""
@@ -54,8 +102,8 @@ class HelpCmd(cmd.Cmd):
     def print_help_text(self, text: str):
         """Print an adaptive and formatted help text for section or search results.
 
-        Sections: help> [list, args, sort, groups]
-        Search: help> argument or group name
+        Sections: help> [list, args]
+        Search: help> argument or group name, config
         :param text: section, argument or group help text
         :return:
         """
@@ -67,7 +115,7 @@ class HelpCmd(cmd.Cmd):
         """Search for help text by topic(argument or group name, search words).
 
         Display corresponding help message for:
-        help> [list, args, sort, groups]
+        help> [list, args]
         help> <topic>
         searching or sorting using indexes from count_files.utils.help_text.py
         default: show long description for <topic in lower case>,
@@ -78,10 +126,6 @@ class HelpCmd(cmd.Cmd):
         key_lower = topic.lower()
         if key_lower == 'args':
             self.print_help_text(docs_args_text)
-        elif key_lower == 'sort':
-            self.print_help_text(docs_sort_text)
-        elif key_lower == 'groups':
-            self.print_help_text(docs_groups_text)
         elif key_lower == 'list':
             self.print_help_text(docs_list_text)
         elif key_lower not in set(chain.from_iterable(indexes.keys())):
