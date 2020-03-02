@@ -2,8 +2,14 @@
 # encoding: utf-8
 import shutil
 import platform
+import os
 
 from count_files.utils.text_extensions import text_extensions_and_mime_types
+
+
+CURRENT_INI = os.path.normpath(os.path.join(os.path.dirname(__file__), 'count_files.ini'))
+# destination file, generate file if CURRENT_INI is not exists
+DST_INI = CURRENT_INI
 
 DOCUMENTATION_URL = 'https://github.com/victordomingos/Count-files#documentation'
 BUG_REPORT_URL = 'https://github.com/victordomingos/Count-files/issues'
