@@ -28,16 +28,19 @@ from argparse import ArgumentParser, Namespace
 from typing import TypeVar, Union
 from pathlib import Path
 from textwrap import fill
+import itertools
 
 from count_files.utils.file_handlers import is_supported_filetype
 from count_files.utils.viewing_modes import show_2columns, show_start_message, \
-    show_result_for_total, show_result_for_search_files
+    show_result_for_total, show_result_for_search_files, show_ext_sorted_by_type
 from count_files.platforms import get_current_os
 from count_files.settings import SUPPORTED_TYPE_INFO_MESSAGE, NOT_SUPPORTED_TYPE_MESSAGE, \
-    DEFAULT_PREVIEW_SIZE, START_TEXT_WIDTH
+    DEFAULT_PREVIEW_SIZE, START_TEXT_WIDTH, CURRENT_INI
 from count_files.utils.help_system_extension import HelpCmd
 from count_files.utils.help_text import topics
 from count_files.utils.decorators import exceptions_decorator
+from count_files.utils.config_handlers import get_available_sections, init_sort_by_type, \
+    prepare_templates, get_correct_location
 
 
 parser = ArgumentParser(
@@ -96,6 +99,9 @@ count_group = parser.add_argument_group('File counting by extension'.upper(),
 
 count_group.add_argument('-alpha', '--sort-alpha', action='store_true', default=False,
                          help=topics['sort-alpha']['short'])
+
+count_group.add_argument('-type', '--sort-type', dest='type', action="append", nargs="+",
+                         help=topics['sort-type']['short'])
 
 search_group = parser.add_argument_group('File searching by extension or by pattern'.upper(),
                                          description=topics['search-group']['short'])
@@ -160,6 +166,12 @@ def main_flow(*args: [argparse_namespace_object, Union[bytes, str]]):
     else:
         location = os.path.expanduser(args.path)
         loc_text = ':\n' + os.path.normpath(location)
+
+    if args.type:
+        # checking for positional argument 'path' in types list
+        location, loc_text = get_correct_location(args)
+        if not location:
+            parser.exit(status=0)
 
     if not os.path.exists(location):
         parser.exit(status=1, message=f'The path {location} '
@@ -239,6 +251,29 @@ def main_flow(*args: [argparse_namespace_object, Union[bytes, str]]):
 
         return len_files
 
+    if args.type:
+        # check for the existence of this file, this is important when using sorting by type
+        types = list(itertools.chain.from_iterable(args.type))
+        file_exist = os.path.exists(CURRENT_INI)
+        if 'default' in types or not file_exist:
+            print('Warning:')
+            init_sort_by_type(types_list=types, config_path=CURRENT_INI, file_exist=file_exist)
+            parser.exit(status=0)
+        else:
+            pass
+        # check if sections(types) and extensions exists
+        import configparser
+        config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
+        config.read(CURRENT_INI)
+        types_list = get_available_sections(types_list=types, config_path=CURRENT_INI, config_parser=config)
+        if not types_list:
+            parser.exit(status=1, message=f"\nNo section(s) and/or extensions in sections detected.\n")
+        # create templates for sorting
+        type_and_ext_storage, ext_and_type_dict = prepare_templates(types_list, args.case_sensitive, config_parser=config)
+        if not type_and_ext_storage or not ext_and_type_dict:
+            # TODO: traceback if configparser.ConfigParser errors
+            parser.exit(status=1, message='Failed to start sorting by type.')
+
     # Parser count_group: counting all files by extension
     print(fill(show_start_message(None, args.case_sensitive, recursive, include_hidden, location),
                width=START_TEXT_WIDTH),
@@ -258,8 +293,14 @@ def main_flow(*args: [argparse_namespace_object, Union[bytes, str]]):
         
     total_occurrences = sum(data.values())
     max_word_width = max(map(len, data.keys()))
-
-    if sort_alpha:
+    if args.type:
+        # sort extensions by type and by frequency
+        data = data.most_common()  # return list with tuples (ext, freq)
+        show_ext_sorted_by_type(data=data, total_occurrences=total_occurrences,
+                                ext_and_type_dict=ext_and_type_dict,
+                                type_and_ext_storage=type_and_ext_storage)
+        parser.exit(status=0)
+    elif sort_alpha:
         # sort extensions alphabetically, with uppercase versions on top
         sort_key = lambda data: (data[0].casefold(), data[0])
         data = sorted(data.items(), key=sort_key)
