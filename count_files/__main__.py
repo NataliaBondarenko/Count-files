@@ -29,7 +29,7 @@ from typing import TypeVar, Union
 from pathlib import Path
 from textwrap import fill
 
-from count_files.utils.file_handlers import is_supported_filetype
+from count_files.utils.file_handlers import is_supported_filetype, check_shell_command
 from count_files.utils.viewing_modes import show_2columns, show_start_message, \
     show_result_for_total, show_result_for_search_files, show_ext_grouped_by_type
 from count_files.platforms import get_current_os
@@ -119,6 +119,9 @@ search_group.add_argument('-ps', '--preview-size', type=int, default=DEFAULT_PRE
 search_group.add_argument('-fs', '--file-sizes', action='store_true', default=False,
                           help=topics['file-sizes']['short'])
 
+search_group.add_argument('-sc', '--shell-command', type=str, default=False, choices=['file'],
+                          help=topics['shell-command']['short'])
+
 parser._positionals.title = parser._positionals.title.upper()
 parser._optionals.title = parser._optionals.title.upper()
 
@@ -137,7 +140,8 @@ def main_flow(*args: [argparse_namespace_object, Union[bytes, str]]):
     Returns parser.exit(status=1):
     if path does not exist or there may be a typo in it,
     if the path has hidden folders and the argument --all is not specified,
-    if the preview is not available for the specified file type.
+    if the preview is not available for the specified file type,
+    if the "file" command is not available or does not work as expected.
     """
     args = parser.parse_args(*args)
     recursive = not args.no_recursion
@@ -178,6 +182,14 @@ def main_flow(*args: [argparse_namespace_object, Union[bytes, str]]):
                                           f' has hidden folders.\n'
                                           f'Use the --all argument to include hidden files and folders.')
 
+    if args.preview and args.shell_command:
+        # check for Unix "file" command
+        preview_with_file, msg = check_shell_command()
+        if not preview_with_file:
+            parser.exit(status=1, message=msg)
+    else:
+        preview_with_file = False  # assigning this local variable to pass the parser test
+
     print("")
     # Parser total_group
     # getting the total number of files for -t .. (all extensions), -t . and -t extension_name
@@ -216,7 +228,8 @@ def main_flow(*args: [argparse_namespace_object, Union[bytes, str]]):
         len_files = show_result_for_search_files(files=data,
                                                  file_sizes=args.file_sizes,
                                                  preview=args.preview,
-                                                 preview_size=args.preview_size)
+                                                 preview_size=args.preview_size,
+                                                 preview_with_file=preview_with_file)
 
         return len_files
 
@@ -225,7 +238,7 @@ def main_flow(*args: [argparse_namespace_object, Union[bytes, str]]):
         print(fill(show_start_message(extension, args.case_sensitive, recursive, include_hidden, location),
                    width=START_TEXT_WIDTH),
               end="\n\n")
-        if args.preview:
+        if args.preview and preview_with_file is False:
             if extension == '.' or not is_supported_filetype(extension.lower()):
                 parser.exit(status=1, message=NOT_SUPPORTED_TYPE_MESSAGE)
 
@@ -239,7 +252,8 @@ def main_flow(*args: [argparse_namespace_object, Union[bytes, str]]):
         len_files = show_result_for_search_files(files=data,
                                                  file_sizes=args.file_sizes,
                                                  preview=args.preview,
-                                                 preview_size=args.preview_size)
+                                                 preview_size=args.preview_size,
+                                                 preview_with_file=preview_with_file)
 
         return len_files
 
