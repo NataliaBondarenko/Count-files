@@ -31,7 +31,7 @@ import os
 from typing import Iterable, List, Tuple, Dict
 from textwrap import wrap
 
-from count_files.utils.file_preview import generate_preview
+from count_files.utils.file_preview import generate_preview, generate_preview_with_file
 from count_files.utils.file_handlers import group_ext_by_type
 from count_files.settings import TERM_WIDTH, DEFAULT_PREVIEW_SIZE
 from count_files.settings import DEFAULT_EXTENSION_COL_WIDTH
@@ -228,7 +228,8 @@ def show_2columns(data: List[tuple],
 def show_result_for_search_files(files: Iterable[str],
                                  file_sizes: bool = False,
                                  preview: bool = False,
-                                 preview_size: int = DEFAULT_PREVIEW_SIZE) -> int:
+                                 preview_size: int = DEFAULT_PREVIEW_SIZE,
+                                 preview_with_file: bool = False) -> int:
     """Print list of all found file paths(with sizes),
     preview, total number of files and size info(summary).
 
@@ -236,6 +237,8 @@ def show_result_for_search_files(files: Iterable[str],
     :param file_sizes: True -> show size info, False -> don't show size info
     :param preview: optional, args.preview, True or False
     :param preview_size: optional, args.preview_size, number
+    :param preview_with_file: using the Unix "file" command
+    to determine the type of data contained in the file
     :return: len(files), print list with paths(default),
     get preview and file_sizes if specified.
 
@@ -249,6 +252,10 @@ def show_result_for_search_files(files: Iterable[str],
     Total combined size: ... KiB.
     Average file size: ... KiB (max: ... KiB, min: ... B).
     """
+    if preview_with_file:
+        get_preview = generate_preview_with_file
+    else:
+        get_preview = generate_preview
     files_amount = 0
     sizes = []
     try:
@@ -262,7 +269,7 @@ def show_result_for_search_files(files: Iterable[str],
             print(f'{os.path.normpath(filepath)} {s if file_sizes else ""}')
             if preview:
                 print('–––––––––––––––––––––––––––––––––––')
-                print(generate_preview(str(f_path), max_size=preview_size))
+                print(get_preview(str(f_path), max_size=preview_size))
                 print("–––––––––––––––––––––––––––––––––––\n")
     except StopIteration:
         print(f"\nNo files were found in the specified directory.\n")
