@@ -53,7 +53,7 @@ arguments = [
              'file-extension', 'fe', 'filename-match', 'fm', 'file-sizes', 'fs',
              'group', 'g', 'help', 'h', 'help-cmd', 'hc',
              'no-feedback', 'nf', 'no-recursion', 'nr',
-             'preview', 'p', 'preview-size', 'ps', 'show-folders', 'sf',
+             'preview', 'p', 'preview-size', 'ps', 'shell-command', 'sc', 'show-folders', 'sf',
              'sort-alpha', 'alpha', 'supported-types', 'st', 'total', 't', 'total-size', 'ts', 'version', 'v']
 
 docs_args_text = f"""COUNT FILES HELP(ARGS).
@@ -99,7 +99,8 @@ Common arguments: directory path and sorting settings that are common to search 
 Special arguments: arguments for counting or searching files.
 Count by extension: alpha or sort-alpha, g or group;
 Total number of files: t or total, sf or show-folders, ts or total-size;
-Search by extension: fe or file-extension, fm or filename-match, fs or file-sizes, p or preview, ps or preview-size.
+Search by extension: 
+fe or file-extension, fm or filename-match, fs or file-sizes, p or preview, ps or preview-size, sc or shell-command.
     help> special
 
 SORTING ARGUMENTS BY TYPE:
@@ -363,6 +364,9 @@ topics = {
         'long': 'Display a short preview (only for text files). '
                 'Preview is available as an option when searching files '
                 'using --file-extension or --filename-match arguments. '
+                'Additional using the `--shell-command file` allows the CLI to detect text files '
+                'with or without an extension and display a preview of those files. '
+                'Otherwise, the preview is only available for files with certain extensions. '
                 'The default text preview size depends on the terminal width settings. '
                 'You can change this value by specifying the argument -ps or --preview-size. '
                 'Example: count-files --file-extension txt --preview ~/Documents <arguments>.'
@@ -389,6 +393,24 @@ topics = {
                 'found file when using --file-extension or --filename-match arguments. '
                 'Additional information: total combined size and average file size. '
                 'Example: count-files --file-extension txt --file-sizes ~/Documents <arguments>.'
+    },
+    'shell-command': {
+        'name': '-sc, --shell-command',
+        'short': 'Apply a shell command to the file paths found '
+                 '(Unix "file" command, file type detector). '
+                 'Use it to improve the preview of files on Linux, Mac OS, '
+                 'and Windows (if the "file" program is installed there).',
+        'long': 'Apply a shell command to the file paths found. '
+                'Only the Unix "file" command without options is supported (file type detector). '
+                'Make sure you are applying the correct "file" program to your files. '
+                'Use it with the --preview argument to improve the preview of files '
+                'on Linux, Mac OS, and Windows (if the "file" program is installed '
+                'and added to the PATH environment variable). '
+                'Using this program allows the CLI to detect text files '
+                'with or without an extension and display a preview of those files. '
+                'Otherwise, the preview is only available for files with certain extensions. '
+                'Example: count-files --file-extension .. --preview --shell-command file <arguments>. '
+                'Example: count-files --filename-match *test* --preview --shell-command file <arguments>.'
     }
 }
 
@@ -442,7 +464,9 @@ indexes = {
     ('ps', 'preview-size', 'preview', 'size', 'search', 'special', 'optional'):
         [topics['preview-size']['name'], topics['preview-size']['short'], topics['preview-size']['long']],
     ('fs', 'file-sizes', 'file', 'sizes', 'search', 'special', 'optional'):
-        [topics['file-sizes']['name'], topics['file-sizes']['short'], topics['file-sizes']['long']]
+        [topics['file-sizes']['name'], topics['file-sizes']['short'], topics['file-sizes']['long']],
+    ('sc', 'shell', 'command', 'shell-command', 'search', 'special', 'optional'):
+        [topics['shell-command']['name'], topics['shell-command']['short'], topics['shell-command']['long']]
 }
 
 
